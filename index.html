@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+<meta name="theme-color" content="#1a1a2e" />
+<title>드림학기제 책자</title>
+
+<!-- Open Graph (카카오톡 등에서 공유될 때 미리보기) -->
+<meta property="og:title" content="드림학기제 책자" />
+<meta property="og:description" content="QR로 만나는 우리의 책자 — 넘겨보세요" />
+<meta property="og:type" content="website" />
+
+<style>
+  :root {
+    --bg-1: #0f0c29;
+    --bg-2: #302b63;
+    --bg-3: #24243e;
+    --accent: #ffd166;
+    --paper: #fffdf8;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+  html, body {
+    height: 100%;
+    overflow: hidden;
+    font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Pretendard", "Malgun Gothic", sans-serif;
+    background: linear-gradient(135deg, var(--bg-1), var(--bg-2), var(--bg-3));
+    background-size: 200% 200%;
+    animation: bgShift 18s ease infinite;
+    color: #fff;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+
+  @keyframes bgShift {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+  }
+
+  /* ===== 로딩 ===== */
+  #loading {
+    position: fixed; inset: 0; z-index: 100;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 22px;
+    transition: opacity .5s ease;
+  }
+  #loading.hide { opacity: 0; pointer-events: none; }
+  .spinner {
+    width: 46px; height: 46px;
+    border: 3px solid rgba(255,255,255,.2);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin .9s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  #loading p { font-size: 15px; letter-spacing: .03em; opacity: .85; }
+  #loadbar { width: 180px; height: 4px; border-radius: 4px; background: rgba(255,255,255,.15); overflow: hidden; }
+  #loadbar span { display: block; height: 100%; width: 0%; background: var(--accent); transition: width .3s ease; }
+
+  /* ===== 표지(커버) 화면 ===== */
+  #cover {
+    position: fixed; inset: 0; z-index: 50;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 28px; padding: 24px;
+    transition: opacity .6s ease, transform .6s ease;
+  }
+  #cover.hide { opacity: 0; transform: scale(1.05); pointer-events: none; }
+
+  .booklet {
+    position: relative;
+    cursor: pointer;
+    transition: transform .35s cubic-bezier(.34,1.56,.64,1);
+    filter: drop-shadow(0 30px 50px rgba(0,0,0,.55));
+  }
+  .booklet:hover { transform: translateY(-8px) rotate(-1deg); }
+  .booklet:active { transform: scale(.97); }
+
+  /* 중철제본 느낌: 가운데 접힘선 + 스테이플 */
+  .booklet .cover-img {
+    display: block;
+    max-height: 62vh;
+    max-width: 80vw;
+    border-radius: 4px 8px 8px 4px;
+    background: var(--paper);
+  }
+  .booklet::before { /* 책등(가운데 접힘) 그림자 */
+    content: "";
+    position: absolute; top: 0; bottom: 0; left: 0;
+    width: 14px;
+    background: linear-gradient(to right, rgba(0,0,0,.28), rgba(0,0,0,0));
+    border-radius: 4px 0 0 4px;
+    pointer-events: none;
+  }
+  .staple {
+    position: absolute; left: 4px; width: 16px; height: 4px;
+    background: linear-gradient(#e8e8ec, #a9a9b2);
+    border-radius: 2px;
+    box-shadow: 0 1px 2px rgba(0,0,0,.4);
+  }
+  .staple.top { top: 22%; }
+  .staple.bottom { bottom: 22%; }
+
+  .cover-title { text-align: center; }
+  .cover-title h1 {
+    font-size: clamp(22px, 6vw, 34px);
+    font-weight: 800; letter-spacing: -.02em;
+  }
+  .tap-hint {
+    margin-top: 10px; font-size: 14px; opacity: .8;
+    display: inline-flex; align-items: center; gap: 8px;
+    animation: pulse 1.8s ease-in-out infinite;
+  }
+  @keyframes pulse { 0%,100% { opacity: .55; } 50% { opacity: 1; } }
+  .open-btn {
+    margin-top: 4px;
+    padding: 13px 30px; border: none; border-radius: 999px;
+    background: var(--accent); color: #2a2440;
+    font-size: 16px; font-weight: 700; cursor: pointer;
+    box-shadow: 0 10px 24px rgba(255,209,102,.35);
+    transition: transform .2s ease;
+  }
+  .open-btn:active { transform: scale(.95); }
+
+  /* ===== 뷰어 화면 ===== */
+  #viewer {
+    position: fixed; inset: 0; z-index: 40;
+    display: none;
+    flex-direction: column; align-items: center; justify-content: center;
+  }
+  #viewer.show { display: flex; }
+
+  #flipbook { touch-action: pan-y; }
+  #flipbook .page-img {
+    width: 100%; height: 100%;
+    object-fit: contain;
+    background: var(--paper);
+  }
+
+  /* 하단 컨트롤 */
+  #controls {
+    position: fixed; bottom: 0; left: 0; right: 0;
+    display: flex; align-items: center; justify-content: center; gap: 18px;
+    padding: 14px 16px calc(14px + env(safe-area-inset-bottom));
+    background: linear-gradient(to top, rgba(0,0,0,.55), transparent);
+    z-index: 41;
+  }
+  .ctrl-btn {
+    width: 46px; height: 46px; border-radius: 50%;
+    border: 1px solid rgba(255,255,255,.25);
+    background: rgba(255,255,255,.12); backdrop-filter: blur(8px);
+    color: #fff; font-size: 20px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: background .2s, transform .1s;
+  }
+  .ctrl-btn:active { transform: scale(.9); background: rgba(255,255,255,.25); }
+  .ctrl-btn:disabled { opacity: .3; pointer-events: none; }
+  #pageInfo {
+    min-width: 72px; text-align: center;
+    font-size: 14px; font-variant-numeric: tabular-nums;
+    padding: 8px 14px; border-radius: 999px;
+    background: rgba(0,0,0,.35);
+  }
+
+  /* 상단 닫기 버튼 */
+  #closeBtn {
+    position: fixed; top: calc(14px + env(safe-area-inset-top)); right: 16px; z-index: 42;
+    width: 42px; height: 42px; border-radius: 50%;
+    border: none; background: rgba(0,0,0,.4); color: #fff;
+    font-size: 20px; cursor: pointer; display: none;
+    align-items: center; justify-content: center;
+  }
+  #closeBtn.show { display: flex; }
+
+  /* 에러 */
+  #error {
+    position: fixed; inset: 0; z-index: 90; display: none;
+    flex-direction: column; align-items: center; justify-content: center;
+    gap: 14px; padding: 30px; text-align: center;
+  }
+  #error.show { display: flex; }
+  #error .emoji { font-size: 44px; }
+  #error p { font-size: 15px; line-height: 1.6; opacity: .9; max-width: 320px; }
+  #error code {
+    background: rgba(255,255,255,.12); padding: 2px 8px; border-radius: 6px;
+    font-size: 13px;
+  }
+</style>
+</head>
+<body>
+
+  <!-- 로딩 -->
+  <div id="loading">
+    <div class="spinner"></div>
+    <p>책자를 불러오는 중…</p>
+    <div id="loadbar"><span></span></div>
+  </div>
+
+  <!-- 표지 -->
+  <div id="cover" style="display:none;">
+    <div class="booklet" id="bookletCover">
+      <span class="staple top"></span>
+      <span class="staple bottom"></span>
+      <img class="cover-img" id="coverImg" alt="책자 표지" />
+    </div>
+    <div class="cover-title">
+      <h1 id="coverHeading">드림학기제 책자</h1>
+      <div class="tap-hint">👆 표지를 눌러 펼쳐보세요</div>
+    </div>
+    <button class="open-btn" id="openBtn">책자 펼치기</button>
+  </div>
+
+  <!-- 뷰어 -->
+  <div id="viewer">
+    <div id="flipbook"></div>
+  </div>
+  <button id="closeBtn" title="닫기">✕</button>
+  <div id="controls" style="display:none;">
+    <button class="ctrl-btn" id="prevBtn" title="이전">‹</button>
+    <div id="pageInfo">– / –</div>
+    <button class="ctrl-btn" id="nextBtn" title="다음">›</button>
+  </div>
+
+  <!-- 에러 -->
+  <div id="error">
+    <div class="emoji">📄</div>
+    <p id="errorMsg"></p>
+  </div>
+
+  <!-- 라이브러리 -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <script src="https://unpkg.com/page-flip@2.0.7/dist/js/page-flip.browser.js"></script>
+
+  <script>
+  // ====== 설정 ======
+  const PDF_URL = "booklet.pdf";   // 이 폴더에 PDF를 booklet.pdf 라는 이름으로 넣어주세요
+  const RENDER_SCALE = 2;          // 페이지 렌더 해상도 (높을수록 선명, 느림)
+  // ==================
+
+  const $ = (id) => document.getElementById(id);
+  const loadingEl = $("loading");
+  const loadbar = $("loadbar").firstElementChild;
+
+  pdfjsLib.GlobalWorkerOptions.workerSrc =
+    "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+
+  let pageImages = [];   // 렌더된 페이지 dataURL 배열
+  let pageW = 0, pageH = 0;
+  let pageFlip = null;
+
+  function showError(msg) {
+    loadingEl.classList.add("hide");
+    $("errorMsg").innerHTML = msg;
+    $("error").classList.add("show");
+  }
+
+  async function init() {
+    let pdf;
+    try {
+      const task = pdfjsLib.getDocument(PDF_URL);
+      task.onProgress = (p) => {
+        if (p.total) loadbar.style.width = Math.round((p.loaded / p.total) * 60) + "%";
+      };
+      pdf = await task.promise;
+    } catch (e) {
+      showError(
+        `<code>${PDF_URL}</code> 파일을 불러오지 못했어요.<br>` +
+        `이 폴더에 PDF를 <b>booklet.pdf</b> 라는 이름으로 넣었는지 확인해주세요.`
+      );
+      return;
+    }
+
+    const total = pdf.numPages;
+
+    // 첫 페이지 크기로 비율 결정
+    const firstPage = await pdf.getPage(1);
+    const vp = firstPage.getViewport({ scale: RENDER_SCALE });
+    pageW = vp.width; pageH = vp.height;
+
+    // 모든 페이지 렌더
+    for (let i = 1; i <= total; i++) {
+      const page = await pdf.getPage(i);
+      const viewport = page.getViewport({ scale: RENDER_SCALE });
+      const canvas = document.createElement("canvas");
+      canvas.width = viewport.width;
+      canvas.height = viewport.height;
+      const ctx = canvas.getContext("2d");
+      await page.render({ canvasContext: ctx, viewport }).promise;
+      pageImages.push(canvas.toDataURL("image/jpeg", 0.85));
+      loadbar.style.width = (60 + Math.round((i / total) * 40)) + "%";
+    }
+
+    // 표지 이미지 = 첫 페이지
+    $("coverImg").src = pageImages[0];
+    $("coverImg").onload = () => {
+      loadingEl.classList.add("hide");
+      $("cover").style.display = "flex";
+    };
+  }
+
+  // ====== 뷰어(플립북) 만들기 ======
+  function buildFlipbook() {
+    const aspect = pageW / pageH;
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    const portrait = vw < 768; // 모바일 = 한 페이지씩
+
+    // 화면에 맞는 페이지 크기 계산
+    let h = vh * 0.82;
+    let w = h * aspect;
+    const maxW = portrait ? vw * 0.92 : vw * 0.46;
+    if (w > maxW) { w = maxW; h = w / aspect; }
+
+    pageFlip = new St.PageFlip($("flipbook"), {
+      width: Math.round(w),
+      height: Math.round(h),
+      size: "stretch",
+      minWidth: 200, maxWidth: 2000,
+      minHeight: 200, maxHeight: 2600,
+      drawShadow: true,
+      flippingTime: 700,
+      usePortrait: portrait,
+      showCover: true,           // 첫 페이지를 표지로
+      mobileScrollSupport: false,
+      maxShadowOpacity: 0.5,
+    });
+
+    pageFlip.loadFromImages(pageImages);
+
+    const total = pageFlip.getPageCount();
+    const updateInfo = () => {
+      const cur = pageFlip.getCurrentPageIndex() + 1;
+      $("pageInfo").textContent = `${cur} / ${total}`;
+      $("prevBtn").disabled = cur <= 1;
+      $("nextBtn").disabled = cur >= total;
+    };
+    pageFlip.on("flip", updateInfo);
+    updateInfo();
+
+    $("prevBtn").onclick = () => pageFlip.flipPrev();
+    $("nextBtn").onclick = () => pageFlip.flipNext();
+  }
+
+  function openViewer() {
+    $("cover").classList.add("hide");
+    setTimeout(() => {
+      $("cover").style.display = "none";
+      $("viewer").classList.add("show");
+      $("controls").style.display = "flex";
+      $("closeBtn").classList.add("show");
+      if (!pageFlip) buildFlipbook();
+    }, 600);
+  }
+
+  function closeViewer() {
+    $("viewer").classList.remove("show");
+    $("controls").style.display = "none";
+    $("closeBtn").classList.remove("show");
+    $("cover").style.display = "flex";
+    requestAnimationFrame(() => $("cover").classList.remove("hide"));
+  }
+
+  $("bookletCover").addEventListener("click", openViewer);
+  $("openBtn").addEventListener("click", openViewer);
+  $("closeBtn").addEventListener("click", closeViewer);
+
+  // 화면 회전/리사이즈 시 플립북 다시 그리기
+  let rsTimer;
+  window.addEventListener("resize", () => {
+    if (!pageFlip || !$("viewer").classList.contains("show")) return;
+    clearTimeout(rsTimer);
+    rsTimer = setTimeout(() => {
+      const idx = pageFlip.getCurrentPageIndex();
+      $("flipbook").innerHTML = "";
+      pageFlip = null;
+      buildFlipbook();
+      setTimeout(() => pageFlip.turnToPage(idx), 50);
+    }, 300);
+  });
+
+  init();
+  </script>
+</body>
+</html>
