@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes, viewport-fit=cover" />
 <meta name="theme-color" content="#1a1a2e" />
 <title>드림학기제 책자</title>
 
@@ -67,10 +67,14 @@
   /* 중철제본 느낌: 가운데 접힘선 + 스테이플 */
   .booklet .cover-img {
     display: block;
-    max-height: 62vh;
-    max-width: 80vw;
+    max-height: 68vh;
+    max-width: 82vw;
     border-radius: 4px 8px 8px 4px;
     background: var(--paper);
+  }
+  /* 모바일: 표지를 더 크게 */
+  @media (max-width: 768px) {
+    .booklet .cover-img { max-height: 82vh; max-width: 92vw; }
   }
   .booklet::before { /* 책등(가운데 접힘) 그림자 */
     content: "";
@@ -97,7 +101,7 @@
   }
   #viewer.show { display: flex; }
 
-  #flipbook { touch-action: pan-y; }
+  #flipbook { touch-action: pan-y pinch-zoom; }
   #flipbook .page-img {
     width: 100%; height: 100%;
     object-fit: contain;
@@ -187,7 +191,8 @@
   <script>
   // ====== 설정 ======
   const PDF_URL = "booklet.pdf";   // 이 폴더에 PDF를 booklet.pdf 라는 이름으로 넣어주세요
-  const RENDER_SCALE = 2;          // 페이지 렌더 해상도 (높을수록 선명, 느림)
+  // 기기 화면 밀도에 맞춰 렌더 해상도 자동 결정 (레티나 폰에서도 선명, 핀치 줌 여유 확보)
+  const RENDER_SCALE = Math.max(2, Math.min((window.devicePixelRatio || 1) * 1.4, 3.5));
   // ==================
 
   const $ = (id) => document.getElementById(id);
@@ -254,10 +259,18 @@
     const portrait = vw < 768; // 모바일 = 한 페이지씩
 
     // 화면에 맞는 페이지 크기 계산
-    let h = vh * 0.82;
-    let w = h * aspect;
-    const maxW = portrait ? vw * 0.92 : vw * 0.46;
-    if (w > maxW) { w = maxW; h = w / aspect; }
+    let w, h;
+    if (portrait) {
+      // 모바일: 가로를 화면 끝까지 꽉 채워 글자를 최대한 크게
+      w = vw;
+      h = w / aspect;
+      if (h > vh) { h = vh; w = h * aspect; }   // 세로가 넘치면 그때만 축소
+    } else {
+      h = vh * 0.86;
+      w = h * aspect;
+      const maxW = vw * 0.46;
+      if (w > maxW) { w = maxW; h = w / aspect; }
+    }
 
     pageFlip = new St.PageFlip($("flipbook"), {
       width: Math.round(w),
