@@ -157,6 +157,22 @@
   #error code {
     background:rgba(255,255,255,.12); padding:2px 8px; border-radius:6px; font-size:13px;
   }
+
+  /* ===== 데스크탑 펼침 ===== */
+  #spreadContainer { display:none; flex-shrink:0; box-shadow:0 20px 60px rgba(0,0,0,.75); }
+  .spread-page { background:#fff; overflow:hidden; flex-shrink:0; }
+  .spread-page img {
+    width:100%; height:100%; object-fit:fill; display:block;
+    -webkit-user-drag:none; transition:opacity .28s ease;
+  }
+  .spread-spine {
+    width:12px; flex-shrink:0;
+    background:linear-gradient(to right,rgba(0,0,0,.30) 0%,rgba(180,180,180,.15) 50%,rgba(0,0,0,.30) 100%);
+  }
+  @media (min-width:768px) {
+    #bookContainer   { display:none !important; }
+    #spreadContainer { display:flex; }
+  }
 </style>
 </head>
 <body>
@@ -186,6 +202,11 @@
         <img id="faceBack" alt="" />
       </div>
     </div>
+  </div>
+  <div id="spreadContainer">
+    <div class="spread-page" id="dLeft"><img id="dLeftImg" alt="" /></div>
+    <div class="spread-spine"></div>
+    <div class="spread-page" id="dRight"><img id="dRightImg" alt="" /></div>
   </div>
 </div>
 <button id="closeBtn" title="닫기">✕</button>
@@ -257,40 +278,74 @@ async function init() {
   };
 }
 
-// ====== CSS 3D 플립 뷰어 ======
+// ====== 뷰어 빌드 ======
 function buildViewer() {
+  if (window.innerWidth >= 768) {
+    buildDesktopSpread();
+  } else {
+    buildMobileFlip();
+  }
+  viewerBuilt = true;
+}
+
+function buildMobileFlip() {
   const vw = window.innerWidth, vh = window.innerHeight;
   const aspect = pageW / pageH;
-
-  let w, h;
-  if (vw < 768) {
-    w = vw; h = Math.round(w / aspect);
-    if (h > vh) { h = vh; w = Math.round(h * aspect); }
-  } else {
-    h = Math.round(vh * 0.86); w = Math.round(h * aspect);
-    const maxW = Math.round(vw * 0.46);
-    if (w > maxW) { w = maxW; h = Math.round(w / aspect); }
-  }
+  let w = vw, h = Math.round(w / aspect);
+  if (h > vh) { h = vh; w = Math.round(h * aspect); }
 
   const bc = $("bookContainer");
   bc.style.width  = w + "px";
   bc.style.height = h + "px";
 
-  // 스와이프 지원
-  let tx0 = 0, ty0 = 0;
-  bc.addEventListener("touchstart", e => {
-    tx0 = e.touches[0].clientX; ty0 = e.touches[0].clientY;
-  }, { passive: true });
-  bc.addEventListener("touchend", e => {
-    const dx = e.changedTouches[0].clientX - tx0;
-    const dy = e.changedTouches[0].clientY - ty0;
-    if (Math.abs(dx) > Math.abs(dy) * 1.2 && Math.abs(dx) > 40) {
-      dx < 0 ? turnNext() : turnPrev();
-    }
-  }, { passive: true });
+  if (!bc._swipeSetup) {
+    let tx0 = 0, ty0 = 0;
+    bc.addEventListener("touchstart", e => {
+      tx0 = e.touches[0].clientX; ty0 = e.touches[0].clientY;
+    }, { passive: true });
+    bc.addEventListener("touchend", e => {
+      const dx = e.changedTouches[0].clientX - tx0;
+      const dy = e.changedTouches[0].clientY - ty0;
+      if (Math.abs(dx) > Math.abs(dy) * 1.2 && Math.abs(dx) > 40) {
+        dx < 0 ? turnNext() : turnPrev();
+      }
+    }, { passive: true });
+    bc._swipeSetup = true;
+  }
 
   setPageImmediate(curPage);
-  viewerBuilt = true;
+}
+
+function buildDesktopSpread() {
+  const vw = window.innerWidth, vh = window.innerHeight;
+  const aspect = pageW / pageH;
+  const SPINE = 12;
+
+  let h = Math.round(vh * 0.88);
+  let pw = Math.round(h * aspect);
+  const maxPW = Math.round((vw - SPINE) * 0.46);
+  if (pw > maxPW) { pw = maxPW; h = Math.round(pw / aspect); }
+
+  // curPage는 항상 짝수 (스프레드의 왼쪽 페이지 인덱스)
+  if (curPage % 2 !== 0) curPage = Math.max(0, curPage - 1);
+
+  const sc = $("spreadContainer");
+  sc.style.width  = (pw * 2 + SPINE) + "px";
+  sc.style.height = h + "px";
+  $("dLeft").style.width   = pw + "px";
+  $("dLeft").style.height  = h + "px";
+  $("dRight").style.width  = pw + "px";
+  $("dRight").style.height = h + "px";
+
+  setSpreadImmediate(curPage);
+}
+
+function setSpreadImmediate(leftIdx) {
+  const ri = leftIdx + 1;
+  $("dLeftImg").src  = pageImages[leftIdx] || "";
+  $("dRightImg").src = ri < pageImages.length ? pageImages[ri] : "";
+  curPage = leftIdx;
+  updateArrows();
 }
 
 function setPageImmediate(idx) {
@@ -306,12 +361,51 @@ function setPageImmediate(idx) {
 }
 
 function updateArrows() {
-  $("prevBtn").disabled = curPage <= 0;
-  $("nextBtn").disabled = curPage >= pageImages.length - 1;
+  if (window.innerWidth >= 768) {
+    $("prevBtn").disabled = curPage <= 0;
+    $("nextBtn").disabled = curPage + 2 >= pageImages.length;
+  } else {
+    $("prevBtn").disabled = curPage <= 0;
+    $("nextBtn").disabled = curPage >= pageImages.length - 1;
+  }
 }
 
-function turnNext() { if (!isFlipping && curPage < pageImages.length - 1) doFlip(curPage + 1,  1); }
-function turnPrev() { if (!isFlipping && curPage > 0)                     doFlip(curPage - 1, -1); }
+function turnNext() {
+  if (isFlipping) return;
+  if (window.innerWidth >= 768) {
+    const next = curPage + 2;
+    if (next < pageImages.length) doDesktopFlip(next);
+  } else {
+    if (curPage < pageImages.length - 1) doFlip(curPage + 1,  1);
+  }
+}
+
+function turnPrev() {
+  if (isFlipping) return;
+  if (window.innerWidth >= 768) {
+    const prev = curPage - 2;
+    if (prev >= 0) doDesktopFlip(prev);
+  } else {
+    if (curPage > 0) doFlip(curPage - 1, -1);
+  }
+}
+
+function doDesktopFlip(newLeftIdx) {
+  isFlipping = true;
+  const DUR = 280;
+  const li = $("dLeftImg"), ri = $("dRightImg");
+  li.style.opacity = "0";
+  ri.style.opacity = "0";
+  setTimeout(() => {
+    curPage = newLeftIdx;
+    li.src = pageImages[newLeftIdx] || "";
+    ri.src = (newLeftIdx + 1 < pageImages.length) ? pageImages[newLeftIdx + 1] : "";
+    li.style.opacity = "1";
+    ri.style.opacity = "1";
+    isFlipping = false;
+    updateArrows();
+  }, DUR);
+}
 
 function doFlip(toIdx, dir) {
   isFlipping = true;
@@ -324,16 +418,13 @@ function doFlip(toIdx, dir) {
   const EASE   = "cubic-bezier(0.77,0,0.175,1)";
 
   if (dir > 0) {
-    // 앞으로: 현재 페이지가 왼쪽으로 넘어가며 다음 페이지 드러남
     front.src = pageImages[curPage];
     back.src  = pageImages[toIdx];
     base.src  = pageImages[toIdx];
-
     card.style.transition  = "none";
     card.style.transform   = "rotateY(0deg)";
     shadow.style.transition = "none";
     shadow.style.opacity   = "0";
-
     requestAnimationFrame(() => requestAnimationFrame(() => {
       card.style.transition   = `transform ${DUR}ms ${EASE}`;
       card.style.transform    = "rotateY(-180deg)";
@@ -341,21 +432,17 @@ function doFlip(toIdx, dir) {
       shadow.style.opacity    = "1";
       setTimeout(() => { shadow.style.opacity = "0"; }, DUR * 0.35);
     }));
-
   } else {
-    // 뒤로: 이미 넘겨진 페이지가 오른쪽으로 되돌아오며 이전 페이지 드러남
-    front.src = pageImages[toIdx];   // 복귀 후 보일 페이지
-    back.src  = pageImages[curPage]; // 복귀 중 보이는 뒷면 (현재 페이지)
-    base.src  = pageImages[toIdx];   // 아래에 깔린 이전 페이지
-
+    front.src = pageImages[toIdx];
+    back.src  = pageImages[curPage];
+    base.src  = pageImages[toIdx];
     card.style.transition = "none";
-    card.style.transform  = "rotateY(-180deg)"; // 이미 넘겨진 상태에서 시작
+    card.style.transform  = "rotateY(-180deg)";
     shadow.style.transition = "none";
     shadow.style.opacity  = "0";
-
     requestAnimationFrame(() => requestAnimationFrame(() => {
       card.style.transition = `transform ${DUR}ms ${EASE}`;
-      card.style.transform  = "rotateY(0deg)";  // 원래 위치로 돌아옴
+      card.style.transform  = "rotateY(0deg)";
     }));
   }
 
@@ -383,7 +470,6 @@ function openViewer() {
   }, 600);
 }
 
-// 버튼은 페이지 로드 시 한 번만 등록
 $("prevBtn").addEventListener("click", () => turnPrev());
 $("nextBtn").addEventListener("click", () => turnNext());
 
@@ -404,10 +490,8 @@ window.addEventListener("resize", () => {
   if (!$("viewer").classList.contains("show")) return;
   clearTimeout(rsTimer);
   rsTimer = setTimeout(() => {
-    const idx = curPage;
     viewerBuilt = false;
     buildViewer();
-    setPageImmediate(idx);
   }, 250);
 });
 
